@@ -1,0 +1,6 @@
+romkan2
+namedivider-python
+pandas
+requests
+ipykernel
+matplotlib
