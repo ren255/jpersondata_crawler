@@ -4,4 +4,3 @@ pandas
 requests
 ipykernel
 matplotlib
-gallery-dl
