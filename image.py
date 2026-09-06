@@ -1,8 +1,10 @@
+# %%
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 import threading
 import requests
+import pandas as pd
 
 output_dir = Path("image")
 output_dir.mkdir(exist_ok=True)
@@ -11,6 +13,7 @@ log_path = "download.log"
 log_lock = threading.Lock()
 
 
+# %%
 def log(msg: str):
     line = f"{datetime.now().isoformat(timespec='seconds')} {msg}"
     with log_lock:
@@ -18,6 +21,7 @@ def log(msg: str):
             f.write(line + "\n")
 
 
+wikidata = pd.read_csv("jpersondata.csv")
 df = wikidata[wikidata["image_url"].notna()][["qid", "image_url"]].sample(40)
 tasks = list(df.itertuples(index=False, name=None))
 
@@ -29,19 +33,22 @@ MAX_WORKERS = 3
 MAX_PASSES = 3
 
 
+def download_url(url: str) -> bytes:
+    resp = session.get(url, timeout=15)
+    if resp.status_code != 200:
+        # ステータスコード + レスポンス本文の頭だけログに残す
+        body_snippet = resp.text[:200].replace("\n", " ")
+        raise RuntimeError(f"HTTP {resp.status_code} body={body_snippet}")
+    resp.raise_for_status()
+    return resp.content
+
+
 def download(task):
     qid, url = task
     filepath = output_dir / f"{qid}.jpg"
     try:
-        resp = session.get(url, timeout=15)
-        status = resp.status_code
-        if status != 200:
-            # ステータスコード + レスポンス本文の頭だけログに残す
-            body_snippet = resp.text[:200].replace("\n", " ")
-            log(f"FAIL qid={qid} status={status} url={url} body={body_snippet}")
-            return (qid, url, f"HTTP {status}")
-        resp.raise_for_status()
-        filepath.write_bytes(resp.content)
+        content = download_url(url)
+        filepath.write_bytes(content)
         return (qid, url, None)
     except requests.exceptions.RequestException as e:
         log(f"FAIL qid={qid} exception={type(e).__name__} msg={e} url={url}")
@@ -65,6 +72,8 @@ def run_pass(task_list, pass_num):
                 )
     return failed
 
+
+# %%
 
 from time import time
 
