@@ -5,3 +5,5 @@ requests
 ipykernel
 matplotlib
 python-Levenshtein
+kagglehub
+python-dotenv
